@@ -1,1 +1,1 @@
-# COMP-6721-Face-Detection-Recognition-App
+# Face-Detection-Recognition-App
