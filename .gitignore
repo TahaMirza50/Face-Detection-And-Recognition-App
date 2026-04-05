@@ -208,4 +208,5 @@ __marimo__/
 
 # Dataset
 dataset/
+face_model.h5
 processed/
