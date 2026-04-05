@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Recognition</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+    :root {
+      --bg:        #080c10;
+      --surface:   #0d1117;
+      --border:    #1e2d3d;
+      --accent:    #00d4ff;
+      --accent2:   #ff3b6e;
+      --known:     #00ffaa;
+      --unknown:   #ff3b6e;
+      --text:      #c9d1d9;
+      --dim:       #4a5568;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-head: 'Orbitron', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      overflow: hidden;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .logo {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .logo span { color: var(--accent2); }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      letter-spacing: 0.12em;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected  { background: var(--known);   box-shadow: 0 0 6px var(--known); }
+    .status-dot.connecting { background: var(--accent);  animation: pulse 1s infinite; }
+    .status-dot.error      { background: var(--unknown); box-shadow: 0 0 6px var(--unknown); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Main viewport ───────────────────────────────────────── */
+    .viewport-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #000;
+      overflow: hidden;
+    }
+
+    /* corner brackets */
+    .viewport-wrapper::before,
+    .viewport-wrapper::after,
+    .corner-br, .corner-bl {
+      content: '';
+      position: absolute;
+      width: 20px; height: 20px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .viewport-wrapper::before { top: 8px;    left: 8px;    border-top: 2px solid var(--accent); border-left:  2px solid var(--accent); }
+    .viewport-wrapper::after  { top: 8px;    right: 8px;   border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+    .corner-br { bottom: 8px; right: 8px;   border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+    .corner-bl { bottom: 8px; left: 8px;    border-bottom: 2px solid var(--accent); border-left:  2px solid var(--accent); }
+
+    video {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    video.ready { opacity: 1; }
+
+    canvas#overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    /* scan-line effect */
+    .scanline {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.08) 3px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ── Controls bar ────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      padding: 8px 20px;
+      border-radius: 3px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .btn:hover  { background: var(--accent); color: var(--bg); box-shadow: 0 0 12px var(--accent); }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; pointer-events: none; }
+
+    .btn.stop { border-color: var(--accent2); color: var(--accent2); }
+    .btn.stop:hover { background: var(--accent2); color: var(--bg); box-shadow: 0 0 12px var(--accent2); }
+
+    .stats {
+      margin-left: auto;
+      display: flex;
+      gap: 20px;
+      font-size: 0.7rem;
+      color: var(--dim);
+    }
+
+    .stats span { color: var(--text); }
+
+    /* ── Log panel ───────────────────────────────────────────── */
+    .log-panel {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 280px;
+      max-height: 180px;
+      background: rgba(8,12,16,0.88);
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      padding: 8px;
+      overflow-y: auto;
+      font-size: 0.65rem;
+      color: var(--dim);
+      z-index: 20;
+    }
+
+    .log-entry { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .log-entry.known   { color: var(--known); }
+    .log-entry.unknown { color: var(--unknown); }
+
+    /* ── Placeholder overlay ─────────────────────────────────── */
+    .placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--dim);
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      z-index: 8;
+    }
+
+    .placeholder svg { opacity: 0.25; }
+    .placeholder.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">Face<span>ID</span> · Recognition System</div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">OFFLINE</span>
+    </div>
+  </header>
+
+  <!-- Viewport -->
+  <div class="viewport-wrapper" id="viewport">
+    <div class="corner-br"></div>
+    <div class="corner-bl"></div>
+    <div class="scanline"></div>
+
+    <!-- Placeholder -->
+    <div class="placeholder" id="placeholder">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="60" height="60" rx="4" stroke="currentColor" stroke-width="2"/>
+        <circle cx="32" cy="26" r="10" stroke="currentColor" stroke-width="2"/>
+        <path d="M10 58c0-12.15 9.85-22 22-22s22 9.85 22 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>CAMERA INACTIVE</span>
+    </div>
+
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+
+    <!-- Detection log -->
+    <div class="log-panel" id="logPanel"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn" id="startBtn" onclick="startCamera()">⏵  Start Camera</button>
+    <button class="btn stop" id="stopBtn" onclick="stopCamera()" disabled>⏹  Stop</button>
+
+    <label style="font-size:0.72rem;color:var(--dim);display:flex;align-items:center;gap:8px;">
+      INTERVAL
+      <select id="intervalSel" style="background:var(--surface);color:var(--text);border:1px solid var(--border);padding:4px 8px;font-family:var(--font-mono);font-size:0.72rem;border-radius:3px;">
+        <option value="300">300 ms</option>
+        <option value="500" selected>500 ms</option>
+        <option value="1000">1 s</option>
+        <option value="2000">2 s</option>
+      </select>
+    </label>
+
+    <label style="font-size:0.72rem;color:var(--dim);display:flex;align-items:center;gap:8px;">
+      QUALITY
+      <select id="qualitySel" style="background:var(--surface);color:var(--text);border:1px solid var(--border);padding:4px 8px;font-family:var(--font-mono);font-size:0.72rem;border-radius:3px;">
+        <option value="0.5">Low (fast)</option>
+        <option value="0.7" selected>Mid</option>
+        <option value="0.92">High</option>
+      </select>
+    </label>
+
+    <div class="stats">
+      <div>FPS <span id="statFps">—</span></div>
+      <div>FACES <span id="statFaces">—</span></div>
+      <div>LATENCY <span id="statLatency">—</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden canvas for frame capture (not rendered) -->
+<canvas id="capture" style="display:none;"></canvas>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const WS_URL = 'ws://localhost:8765';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let ws            = null;
+let stream        = null;
+let captureTimer  = null;
+let waitingReply  = false;
+let frameTs       = 0;
+let fpsCounter    = { frames: 0, last: performance.now() };
+let lastDetections = [];
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const video      = document.getElementById('video');
+const overlay    = document.getElementById('overlay');
+const capture    = document.getElementById('capture');
+const ctx        = overlay.getContext('2d');
+const capCtx     = capture.getContext('2d');
+const statusDot  = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const startBtn   = document.getElementById('startBtn');
+const stopBtn    = document.getElementById('stopBtn');
+const placeholder= document.getElementById('placeholder');
+const logPanel   = document.getElementById('logPanel');
+const intervalSel= document.getElementById('intervalSel');
+const qualitySel = document.getElementById('qualitySel');
+const statFps    = document.getElementById('statFps');
+const statFaces  = document.getElementById('statFaces');
+const statLatency= document.getElementById('statLatency');
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  setStatus('connecting', 'CONNECTING…');
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setStatus('connected', 'CONNECTED');
+    log('WebSocket connected to ' + WS_URL, '');
+  };
+
+  ws.onmessage = (evt) => {
+    const elapsed = performance.now() - frameTs;
+    statLatency.textContent = Math.round(elapsed) + ' ms';
+
+    waitingReply = false;
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.error) { console.warn('Server error:', data.error); return; }
+      lastDetections = data.detections || [];
+      statFaces.textContent = lastDetections.length;
+      drawDetections(lastDetections);
+      logDetections(lastDetections);
+    } catch (e) {
+      console.error('Parse error:', e);
+    }
+  };
+
+  ws.onerror = () => setStatus('error', 'WS ERROR');
+
+  ws.onclose = () => {
+    setStatus('', 'OFFLINE');
+    log('WebSocket closed.', '');
+    // Redraw last boxes as faded
+    lastDetections = [];
+    drawDetections([]);
+  };
+}
+
+function disconnectWS() {
+  if (ws) { ws.close(); ws = null; }
+}
+
+// ── Camera ───────────────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      video.classList.add('ready');
+      placeholder.classList.add('hidden');
+      syncCanvasSize();
+      connectWS();
+      startCapture();
+    };
+    startBtn.disabled = true;
+    stopBtn.disabled  = false;
+  } catch (e) {
+    alert('Camera access denied or unavailable.\n' + e.message);
+  }
+}
+
+function stopCamera() {
+  stopCapture();
+  disconnectWS();
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  video.srcObject = null;
+  video.classList.remove('ready');
+  placeholder.classList.remove('hidden');
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  lastDetections = [];
+  startBtn.disabled = false;
+  stopBtn.disabled  = true;
+  statFps.textContent = statFaces.textContent = statLatency.textContent = '—';
+}
+
+// ── Frame capture & send ──────────────────────────────────────────────────────
+function startCapture() {
+  const interval = parseInt(intervalSel.value, 10);
+  captureTimer = setInterval(captureAndSend, interval);
+  // Also keep FPS counter ticking
+  requestAnimationFrame(fpsLoop);
+}
+
+function stopCapture() {
+  clearInterval(captureTimer);
+  captureTimer = null;
+}
+
+function captureAndSend() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (waitingReply) return;  // skip frame if server still processing
+  if (video.readyState < 2)  return;
+
+  syncCanvasSize();
+  capCtx.drawImage(video, 0, 0, capture.width, capture.height);
+
+  const quality = parseFloat(qualitySel.value);
+  const dataURL = capture.toDataURL('image/jpeg', quality);
+
+  frameTs = performance.now();
+  waitingReply = true;
+  ws.send(dataURL);        // send as base64 data-URL string
+}
+
+// ── Canvas sizing ─────────────────────────────────────────────────────────────
+function syncCanvasSize() {
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
+
+  if (capture.width !== vw || capture.height !== vh) {
+    capture.width  = vw;
+    capture.height = vh;
+  }
+
+  // Overlay must match the *displayed* size of the video element
+  const rect = video.getBoundingClientRect();
+  if (overlay.width !== Math.round(rect.width) || overlay.height !== Math.round(rect.height)) {
+    overlay.width  = Math.round(rect.width);
+    overlay.height = Math.round(rect.height);
+  }
+}
+
+window.addEventListener('resize', () => {
+  syncCanvasSize();
+  drawDetections(lastDetections);
+});
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+function drawDetections(detections) {
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
+  const ow = overlay.width;
+  const oh = overlay.height;
+
+  // Scale factors (video pixel → overlay pixel)
+  const scaleX = ow / vw;
+  const scaleY = oh / vh;
+
+  ctx.clearRect(0, 0, ow, oh);
+
+  // Horizontal scan animation line
+  const t   = (Date.now() % 3000) / 3000;
+  const scanY = oh * t;
+  const grad  = ctx.createLinearGradient(0, scanY - 30, 0, scanY + 30);
+  grad.addColorStop(0,   'rgba(0,212,255,0)');
+  grad.addColorStop(0.5, 'rgba(0,212,255,0.08)');
+  grad.addColorStop(1,   'rgba(0,212,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, scanY - 30, ow, 60);
+
+  for (const d of detections) {
+    const x = d.x * scaleX;
+    const y = d.y * scaleY;
+    const w = d.w * scaleX;
+    const h = d.h * scaleY;
+
+    const isKnown = d.label !== 'Unknown';
+    const color   = isKnown ? '#00ffaa' : '#ff3b6e';
+    const alpha   = 0.85;
+
+    // Box
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(x, y, w, h);
+
+    // Corner accents
+    const cs = 14;
+    ctx.lineWidth = 2.5;
+    [
+      [x, y, cs, 0, 0, cs],
+      [x+w, y, -cs, 0, 0, cs],
+      [x, y+h, cs, 0, 0, -cs],
+      [x+w, y+h, -cs, 0, 0, -cs],
+    ].forEach(([px, py, dx1, dy1, dx2, dy2]) => {
+      ctx.beginPath();
+      ctx.moveTo(px + dx1, py + dy1);
+      ctx.lineTo(px, py);
+      ctx.lineTo(px + dx2, py + dy2);
+      ctx.stroke();
+    });
+
+    // Label background
+    const label     = `${d.label}  ${(d.confidence * 100).toFixed(0)}%`;
+    ctx.font        = '11px "Share Tech Mono", monospace';
+    const textW     = ctx.measureText(label).width + 12;
+    const labelH    = 20;
+    const labelY    = y > labelH + 4 ? y - labelH - 2 : y + h + 2;
+
+    ctx.fillStyle   = color;
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(x, labelY, textW, labelH);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle   = '#080c10';
+    ctx.fillText(label, x + 6, labelY + 13.5);
+  }
+}
+
+// ── FPS loop ──────────────────────────────────────────────────────────────────
+function fpsLoop(now) {
+  fpsCounter.frames++;
+  const elapsed = now - fpsCounter.last;
+  if (elapsed >= 1000) {
+    statFps.textContent = Math.round(fpsCounter.frames * 1000 / elapsed);
+    fpsCounter.frames = 0;
+    fpsCounter.last   = now;
+  }
+  // Redraw boxes each animation frame so scan line animates
+  if (captureTimer) drawDetections(lastDetections);
+  requestAnimationFrame(fpsLoop);
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+const MAX_LOG = 40;
+function logDetections(detections) {
+  if (detections.length === 0) return;
+  const ts = new Date().toLocaleTimeString();
+  detections.forEach(d => {
+    const isKnown = d.label !== 'Unknown';
+    const entry   = document.createElement('div');
+    entry.className = 'log-entry ' + (isKnown ? 'known' : 'unknown');
+    entry.textContent = `[${ts}] ${d.label} (${(d.confidence*100).toFixed(0)}%)`;
+    logPanel.prepend(entry);
+  });
+  // Trim
+  while (logPanel.children.length > MAX_LOG) logPanel.removeChild(logPanel.lastChild);
+}
+
+function log(msg, cls) {
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + cls;
+  entry.textContent = msg;
+  logPanel.prepend(entry);
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function setStatus(state, text) {
+  statusDot.className = 'status-dot ' + state;
+  statusText.textContent = text;
+}
+
+// ── Kick off FPS counter immediately ─────────────────────────────────────────
+requestAnimationFrame(fpsLoop);
+</script>
+</body>
+</html>
