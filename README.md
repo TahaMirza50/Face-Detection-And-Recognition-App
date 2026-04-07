@@ -9,7 +9,7 @@ This project is a real-time face detection and recognition application developed
 
 The application uses a webcam to detect faces in live video, recognize specific individuals it has been trained on, and label anyone it cannot confidently identify as **Unknown**.
 
-The project covers the full AI pipeline: collecting a custom image dataset of at least 5 people (minimum 30 images each), preprocessing the images through cropping, resizing, normalization, and data augmentation, and training a Convolutional Neural Network (CNN) using either Keras or PyTorch. A face detector (such as OpenCV or MTCNN) handles real-time face localization, feeding cropped faces into the CNN which outputs a predicted identity and a confidence score. If the score falls below a chosen threshold, the person is marked as Unknown.
+The project covers the full AI pipeline: collecting a custom image dataset of at least 4-5 people (minimum 30 images each), preprocessing the images through cropping, resizing, normalization, and data augmentation, and training a Convolutional Neural Network (CNN) using TensorFlow/Keras. A face detector (such as OpenCV or MTCNN) handles real-time face localization, feeding cropped faces into the CNN which outputs a predicted identity and a confidence score. If the score falls below a chosen threshold, the person is marked as Unknown.
 
 The final application displays a live webcam feed with bounding boxes around detected faces, the predicted name or "Unknown", and the associated confidence score.
 
@@ -77,63 +77,46 @@ Face-Detection-And-Recognition-App/
 
 Open `Local_Notebook.ipynb` in Jupyter or VS Code and run cells sequentially:
 
-#### **Section 1: Preprocessing** (Cells 2-9)
-- Runs face detection on raw images
-- Crops, resizes, and augments images
-- Splits data into train/val/test sets (70% / 15% / 15%)
-- Output: Preprocessed images in `processed/` folder
-
+#### **Section 1: Preprocessing**
 ```python
 # Cell 2: Edit configuration if needed
 DATASET_DIR = "dataset"
 IMG_SIZE = (224, 224)
+TRAIN_RATIO = 0.70
+VAL_RATIO = 0.15
+TEST_RATIO = 0.15
 
-# Cells 3-9: Run preprocessing pipeline
+# Then run cells 3+ to start preprocessing
 ```
 
-#### **Section 2: Training** (Cells 10-20)
-- Loads preprocessed data
-- Builds and trains a 4-block CNN
-- Applies early stopping and learning rate reduction
-- Saves best model to `face_model.h5`
-- Saves class mapping to `class_names.json`
-
+#### **Section 2: Training**
 ```python
-# Cells 10-20: Run training (typically 10-30 minutes)
-# Best model is automatically saved and monitored via validation accuracy
+# Run cells to build CNN and train
+# NUM_CLASSES = 6 (Aafreen, Harsha, Syeda, Arjun, Taha, Unknown)
+# Best model auto-saves to face_model.h5
 ```
 
-#### **Section 3: Testing** (Cells 26-30)
-- Loads the trained model
-- Tests on validation/test sets
-- Displays classification reports and confusion matrix
-- Tests different confidence thresholds
-
+#### **Section 3: Testing & Evaluation**
 ```python
-# Cells 26-30: Run evaluation (optional but recommended)
+# Run cells to evaluate model on test set
+# Includes confidence threshold analysis (default: 0.90)
 ```
 
 ### Step 3: Run the Backend Server
 
-Run Cell 31 (Debug + WebSocket Server) to start the real-time recognition backend:
+Run the WebSocket server cell to start the backend:
 
 ```python
-# Cell 31: Run this cell LAST and keep it running
-# The server will start on ws://localhost:8765
+# Run the backend cell and keep it running
+# Server starts on ws://localhost:8765
 ```
 
-You should see:
+Server output:
 ```
-[*] Classes: {'0': 'Aafreen', '1': 'Syeda', '2': 'Taha'}
-[*] Loading model from face_model.h5 ...
-[✓] Model loaded successfully
-───────────────────────────────────────────────────────
+[*] Model loaded successfully.
   WebSocket server  ->  ws://localhost:8765
-  Classes           ->  ['Aafreen', 'Syeda', 'Taha']
-  Threshold         ->  0.75
-  Image size        ->  (224, 224)
-───────────────────────────────────────────────────────
-[*] Open frontend.html in your browser. Ctrl-C to stop.
+  Threshold         ->  0.90
+[*] Open frontend.html in your browser
 ```
 
 ### Step 4: Open the Frontend
@@ -144,49 +127,15 @@ Open `frontend.html` in your web browser:
 2. Allow webcam access
 3. The app will stream frames to the backend
 4. Detection results display in real-time with:
-   - **Green boxes** = Known person (confidence ≥ 0.75)
-   - **Pink boxes** = Unknown person (confidence < 0.75)
+   - **Green boxes** = Known person (confidence ≥ 0.90)
+   - **Pink boxes** = Unknown person (confidence < 0.90)
    - Bounding boxes, labels, and confidence scores
 
 ---
 
 ## Running Backend Separately
 
-Once the model is trained and `face_model.h5` + `class_names.json` are saved, you can run just the backend server without retraining:
-
-**Option 1: Quick start (minimal dependencies)**
-```bash
-# Install only essential packages
-pip install tensorflow websockets nest_asyncio opencv-python numpy
-
-# Run the server
-python -c "
-import jupyter_client
-from ipykernel.kernelapp import IPKernelApp
-# Run Cell 31 from the notebook
-"
-```
-
-**Option 2: Use the notebook debug cell**
-1. Run Cell labeled "DEBUG CELL" to verify model loads correctly
-2. Then run Cell 31 to start the server
-
-**Option 3: Extract as standalone script**
-Create a file `server.py`:
-```python
-import asyncio, base64, json, cv2, numpy as np
-import websockets, nest_asyncio
-from tensorflow.keras.models import load_model
-
-# (Copy the code from Cell 31 here)
-
-asyncio.run(_main())
-```
-
-Then run:
-```bash
-python server.py
-```
+Once `face_model.h5` and `class_names.json` are saved, run the backend server cell independently to start the WebSocket server without retraining.
 
 ---
 
@@ -204,6 +153,6 @@ python server.py
 
 ## Notes
 
-- The backend is **modular** → Can be reused for other applications once the model is trained
-- The training notebook is self-contained → All preprocessing, training, and evaluation happens in one file
-- Preprocessing includes **automatic data augmentation** → 7 variants per image in training set for better generalization
+- Full preprocessing, training, and evaluation pipeline in one notebook
+- Real-time WebSocket backend for live recognition
+- Automatic data augmentation (7 variants per training image)
