@@ -383,6 +383,8 @@ async function startCamera() {
       video.classList.add('ready');
       placeholder.classList.add('hidden');
       syncCanvasSize();
+      // Force canvas redraw by resetting dimensions
+      overlay.width = overlay.width;
       connectWS();
       startCapture();
     };
@@ -400,7 +402,8 @@ function stopCamera() {
   video.srcObject = null;
   video.classList.remove('ready');
   placeholder.classList.remove('hidden');
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  // Force clear canvas by resetting dimensions
+  overlay.width = overlay.width;
   lastDetections = [];
   startBtn.disabled = false;
   stopBtn.disabled  = true;
