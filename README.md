@@ -40,7 +40,7 @@ Face-Detection-And-Recognition-App/
 ├── face_model.h5                 # Trained CNN model (added after training)
 ├── class_names.json              # Mapping of class indices to names
 ├── requirements.txt
-├── Final Projects/pdf
+├── Final Projects.pdf
 ├── Report.pdf
 ├── dataset/                      # Raw dataset folder (⚠️ NOT PUSHED TO GITHUB)
 └── README.md
@@ -136,18 +136,6 @@ Open `frontend.html` in your web browser:
 ## Running Backend Separately
 
 Once `face_model.h5` and `class_names.json` are saved, run the backend server cell independently to start the WebSocket server without retraining.
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Model loads with wrong confidence (e.g., 37%) | Keras version mismatch. The notebook will auto-fallback using h5py. Check Cell 31 output logs. |
-| Frontend shows "Unknown" for known faces | Lower the confidence threshold in `frontend.html` (line with `_THRESHOLD`) or retrain with more data. |
-| No bounding boxes appear | Ensure WebSocket server is running and check browser console for errors. |
-| Camera permission denied | Grant webcam access when browser prompts. |
-| Out of memory during training | Reduce `BATCH_SIZE` in Cell 11 (e.g., from 16 to 8). |
 
 ---
 
