@@ -39,10 +39,9 @@ Face-Detection-And-Recognition-App/
 ├── frontend.html                 # Web-based frontend for real-time recognition
 ├── face_model.h5                 # Trained CNN model (added after training)
 ├── class_names.json              # Mapping of class indices to names
-├── processed/                    # Preprocessed dataset (train/val/test splits)
-│   ├── train/
-│   ├── val/
-│   └── test/
+├── requirements.txt
+├── Final Projects/pdf
+├── Report.pdf
 ├── dataset/                      # Raw dataset folder (⚠️ NOT PUSHED TO GITHUB)
 └── README.md
 ```
@@ -72,6 +71,7 @@ Face-Detection-And-Recognition-App/
    ```
    - Each person should have at least 30 images
    - Images can be `.jpg`, `.jpeg`, or `.png`
+3. Dataset used to train is provided on moodle under project submission.
 
 ### Step 2: Open the Notebook
 
